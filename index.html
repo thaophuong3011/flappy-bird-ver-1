@@ -1,0 +1,2643 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Flappy Bird – Polished Clone</title>
+  <meta name="description"
+    content="A polished Flappy Bird clone built with HTML5 Canvas and the Web Audio API. No external assets required." />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #game-wrapper {
+      position: relative;
+      width: 420px;
+      height: 680px;
+      box-shadow: 0 0 60px rgba(100, 200, 255, 0.25), 0 0 120px rgba(100, 200, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Overlay Panels */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* pointer-events: none on a parent does NOT cascade to children with
+       explicit pointer-events set (e.g. #gameover-panel has pointer-events:all).
+       This rule forces ALL descendants of a hidden overlay to be non-interactive. */
+    .overlay.hidden * {
+      pointer-events: none !important;
+    }
+
+    #overlay-ready {
+      background: transparent;
+    }
+
+    #ready-title {
+      font-size: 28px;
+      color: #fff;
+      text-shadow: 3px 3px 0 #e8a000, 0 0 20px rgba(255, 200, 0, 0.6);
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+    }
+
+    #ready-subtitle {
+      font-size: 9px;
+      color: #ffe;
+      text-shadow: 1px 1px 0 #555;
+      animation: blink 1.1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* Game Over Panel */
+    #overlay-gameover {
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(4px);
+    }
+
+    #gameover-panel {
+      background: linear-gradient(160deg, #1e3a5f 0%, #0d2137 100%);
+      border: 3px solid #4fc3f7;
+      border-radius: 12px;
+      padding: 28px 36px;
+      text-align: center;
+      min-width: 280px;
+      box-shadow: 0 0 30px rgba(79, 195, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      pointer-events: all;
+    }
+
+    #gameover-title {
+      font-size: 20px;
+      color: #ff6b6b;
+      text-shadow: 2px 2px 0 #8b0000;
+      margin-bottom: 24px;
+    }
+
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 10px 0;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+    }
+
+    .score-label {
+      font-size: 7px;
+      color: #90caf9;
+      letter-spacing: 1px;
+    }
+
+    .score-value {
+      font-size: 16px;
+      color: #fff;
+      text-shadow: 1px 1px 0 #333;
+    }
+
+    .score-value.gold {
+      color: #ffd700;
+      text-shadow: 1px 1px 0 #a07000;
+    }
+
+    #medal-area {
+      margin: 16px 0;
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    #btn-restart {
+      margin-top: 20px;
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #43e97b, #38f9d7);
+      color: #003300;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1a8a4a, 0 0 20px rgba(67, 233, 123, 0.4);
+      transition: transform 0.1s, box-shadow 0.1s;
+      pointer-events: all;
+      letter-spacing: 1px;
+    }
+
+    #btn-restart:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #1a8a4a, 0 0 28px rgba(67, 233, 123, 0.5);
+    }
+
+    #btn-restart:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #1a8a4a;
+    }
+
+    /* Flash overlay */
+    #flash {
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.05s;
+    }
+
+    /* Score HUD */
+    #hud-score {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 36px;
+      color: #fff;
+      text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      transition: transform 0.1s;
+    }
+
+    #hud-score.pop {
+      transform: translateX(-50%) scale(1.4);
+    }
+
+    @media (max-width: 440px) {
+      #game-wrapper {
+        width: 100vw;
+        height: 100dvh;
+        border-radius: 0;
+      }
+    }
+
+    /* ── Username Modal ───────────────────────────────────────────────── */
+    #username-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(10, 12, 40, 0.82);
+      backdrop-filter: blur(8px);
+      transition: opacity 0.4s ease;
+    }
+    #username-modal.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #username-card {
+      background: linear-gradient(160deg, #1e3a5f 0%, #0d2137 100%);
+      border: 2px solid #4fc3f7;
+      border-radius: 16px;
+      padding: 36px 40px;
+      text-align: center;
+      width: 340px;
+      box-shadow: 0 0 40px rgba(79,195,247,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    #username-card h2 {
+      font-size: 13px;
+      color: #fff;
+      text-shadow: 2px 2px 0 #e8a000;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    #username-card p {
+      font-size: 7px;
+      color: #90caf9;
+      margin-bottom: 24px;
+      line-height: 1.7;
+    }
+    #username-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.07);
+      border: 1.5px solid rgba(79,195,247,0.5);
+      border-radius: 8px;
+      color: #fff;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      outline: none;
+      text-align: center;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 18px;
+    }
+    #username-input:focus {
+      border-color: #4fc3f7;
+      box-shadow: 0 0 12px rgba(79,195,247,0.35);
+    }
+    #username-input::placeholder { color: rgba(255,255,255,0.3); }
+    #username-error {
+      font-size: 7px;
+      color: #ff6b6b;
+      min-height: 14px;
+      margin-bottom: 12px;
+    }
+    #username-submit {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #43e97b, #38f9d7);
+      color: #003300;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1a8a4a, 0 0 20px rgba(67,233,123,0.35);
+      transition: transform 0.1s, box-shadow 0.1s;
+      letter-spacing: 1px;
+    }
+    #username-submit:hover  { transform: translateY(-2px); box-shadow: 0 6px 0 #1a8a4a; }
+    #username-submit:active { transform: translateY(2px);  box-shadow: 0 2px 0 #1a8a4a; }
+    #username-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    #modal-status {
+      font-size: 7px;
+      color: #4fc3f7;
+      margin-top: 14px;
+      min-height: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Username Modal -->
+  <div id="username-modal">
+    <div id="username-card">
+      <h2>FLAPPY BIRD</h2>
+      <p>Enter your username to save<br>stats &amp; compete globally!</p>
+      <input id="username-input" type="text" maxlength="20"
+             placeholder="YourName" autocomplete="off" spellcheck="false" />
+      <div id="username-error"></div>
+      <button id="username-submit">▶ ENTER</button>
+      <div id="modal-status"></div>
+    </div>
+  </div>
+
+  <div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Flash overlay -->
+    <div id="flash"></div>
+
+    <!-- Score HUD -->
+    <div id="hud-score">0</div>
+
+    <!-- Get Ready Overlay -->
+    <div class="overlay hidden" id="overlay-ready">
+      <div id="ready-title">FLAPPY BIRD</div>
+      <div id="ready-subtitle">TAP / CLICK / SPACE TO START</div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div class="overlay hidden" id="overlay-gameover">
+      <div id="gameover-panel">
+        <div id="gameover-title">GAME OVER</div>
+        <div id="medal-area">🏅</div>
+        <div class="score-row">
+          <span class="score-label">SCORE</span>
+          <span class="score-value" id="final-score">0</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">BEST</span>
+          <span class="score-value gold" id="high-score">0</span>
+        </div>
+        <button id="btn-restart">▶ MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── CONSTANTS ─────────────────────────────────────────────────────────────
+    const CANVAS_W = 420;
+    const CANVAS_H = 680;
+    const GRAVITY = 0.55;
+    const JUMP_VEL = -9.5;
+    const PIPE_SPEED = 2.8;
+    const GROUND_H = 90;
+    const PIPE_GAP = 160;
+    const PIPE_WIDTH = 62;
+    const PIPE_INTERVAL = 1700; // ms between pipes
+    const BIRD_X = 90;
+    const PERFECT_ZONE = 13; // px from gap centre that counts as PERFECT
+    const COMBO_MAX    = 10; // max combo multiplier cap
+
+    const API_BASE = 'http://localhost:3000/api';
+
+    const STATES = { MENU: 'menu', READY: 'ready', PLAYING: 'playing', GAMEOVER: 'gameover', LEADERBOARD: 'leaderboard', DAILY: 'daily' };
+
+    // ─── API CLIENT ────────────────────────────────────────────────────────────
+    const ApiClient = {
+      _token: null,
+      _username: null,
+      _online: true,   // flips to false on first network error, restored on success
+
+      get token()    { return this._token    || localStorage.getItem('flappy_token'); },
+      get username() { return this._username || localStorage.getItem('flappy_username'); },
+
+      _authHeader() {
+        return this.token ? { 'Authorization': `Bearer ${this.token}` } : {};
+      },
+
+      // Generate a matching token for the given username (mirrors server logic)
+      makeToken(username) {
+        const secret = 'flappy_super_secret_key_2024'; // must match .env AUTH_SECRET
+        return btoa(`${username.toLowerCase()}:${secret}`);
+      },
+
+      async createOrLogin(username) {
+        const res = await fetch(`${API_BASE}/player`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        this._token    = data.token;
+        this._username = data.player.username;
+        localStorage.setItem('flappy_token',    data.token);
+        localStorage.setItem('flappy_username', data.player.username);
+        this._online = true;
+        return data.player;
+      },
+
+      async getPlayer(username) {
+        const res = await fetch(`${API_BASE}/player/${encodeURIComponent(username)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        this._online = true;
+        return data.player;
+      },
+
+      // delta: { bestScore, bestCombo, playsThisSession, deathsThisSession, selectedSkin }
+      async pushStats(delta) {
+        if (!this.username || !this.token) return;
+        try {
+          const res = await fetch(`${API_BASE}/player/${encodeURIComponent(this.username)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...this._authHeader() },
+            body: JSON.stringify({
+              bestScore:   delta.bestScore,
+              bestCombo:   delta.bestCombo,
+              totalPlays:  delta.playsThisSession  || 0,
+              totalDeaths: delta.deathsThisSession || 0,
+              selectedSkin: delta.selectedSkin,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            this._online = true;
+            // Merge server truth back into localStorage
+            Stats._mergeFromServer(data.player);
+          }
+        } catch {
+          this._online = false; // fall back silently
+        }
+      },
+
+      async getLeaderboard() {
+        const res = await fetch(`${API_BASE}/leaderboard`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        this._online = true;
+        return data.leaderboard;
+      },
+    };
+
+    // ─── PLAYER STATS ──────────────────────────────────────────────────────────
+    const Stats = {
+      _k: { best: 'flappy_best', plays: 'flappy_plays', deaths: 'flappy_deaths', skin: 'flappy_skin', combo: 'flappy_combo' },
+      // Session counters (reset each page load, sent as delta to server)
+      _sessionPlays:  0,
+      _sessionDeaths: 0,
+
+      get bestScore()   { return parseInt(localStorage.getItem(this._k.best)   || '0', 10); },
+      get totalPlays()  { return parseInt(localStorage.getItem(this._k.plays)  || '0', 10); },
+      get totalDeaths() { return parseInt(localStorage.getItem(this._k.deaths) || '0', 10); },
+      get bestCombo()   { return parseInt(localStorage.getItem(this._k.combo)  || '0', 10); },
+      get selectedSkin(){ return parseInt(localStorage.getItem(this._k.skin)   || '0', 10); },
+
+      set selectedSkin(v) {
+        localStorage.setItem(this._k.skin, v);
+        // Push skin change online immediately
+        ApiClient.pushStats({ bestScore: this.bestScore, bestCombo: this.bestCombo,
+          playsThisSession: 0, deathsThisSession: 0, selectedSkin: v });
+      },
+
+      recordPlay() {
+        localStorage.setItem(this._k.plays, this.totalPlays + 1);
+        this._sessionPlays++;
+      },
+      recordDeath() {
+        localStorage.setItem(this._k.deaths, this.totalDeaths + 1);
+        this._sessionDeaths++;
+      },
+      recordScore(s) {
+        if (s > this.bestScore) localStorage.setItem(this._k.best, s);
+      },
+      recordCombo(c) {
+        if (c > this.bestCombo) localStorage.setItem(this._k.combo, c);
+      },
+
+      // Called after each game over — sends the session delta to the server
+      async syncToServer() {
+        await ApiClient.pushStats({
+          bestScore:        this.bestScore,
+          bestCombo:        this.bestCombo,
+          playsThisSession: this._sessionPlays,
+          deathsThisSession:this._sessionDeaths,
+          selectedSkin:     this.selectedSkin,
+        });
+        // Reset session counters after sending
+        this._sessionPlays  = 0;
+        this._sessionDeaths = 0;
+      },
+
+      // Merge server-authoritative values into localStorage (server wins on bests)
+      _mergeFromServer(p) {
+        if (!p) return;
+        if (p.bestScore  > this.bestScore)  localStorage.setItem(this._k.best,   p.bestScore);
+        if (p.bestCombo  > this.bestCombo)  localStorage.setItem(this._k.combo,  p.bestCombo);
+        if (p.totalPlays > this.totalPlays)  localStorage.setItem(this._k.plays,  p.totalPlays);
+        if (p.totalDeaths> this.totalDeaths) localStorage.setItem(this._k.deaths, p.totalDeaths);
+        // Always trust server's selectedSkin
+        localStorage.setItem(this._k.skin, p.selectedSkin);
+      },
+
+      // Boot: load server data and merge
+      async loadFromServer() {
+        if (!ApiClient.username) return;
+        try {
+          const p = await ApiClient.getPlayer(ApiClient.username);
+          this._mergeFromServer(p);
+        } catch { /* offline – localStorage is already populated */ }
+      },
+    };
+
+    // ─── SKIN DATA ─────────────────────────────────────────────────────────────
+    const SKINS = [
+      { id: 0, name: 'Classic',  bodyColor: '#FFD700', wingColor: '#e8b800', bellyColor: '#fff4a0', beakColor: '#FF8C00', unlock: { type: 'default' } },
+      { id: 1, name: 'Sky',      bodyColor: '#4fc3f7', wingColor: '#0288d1', bellyColor: '#b3e5fc', beakColor: '#FF8C00', accessory: 'halo', unlock: { type: 'score',  value: 10 } },
+      { id: 2, name: 'Flame',    bodyColor: '#FF5722', wingColor: '#111111', bellyColor: '#FFCCBC', beakColor: '#FFD740', accessory: 'horns', unlock: { type: 'score',  value: 20 } },
+      { id: 3, name: 'Mint',     bodyColor: '#43e97b', wingColor: '#1b5e20', bellyColor: '#ccffdd', beakColor: '#FF8C00', accessory: 'glasses', unlock: { type: 'score',  value: 50 } },
+      { id: 4, name: 'Galaxy',   bodyColor: '#9c27b0', wingColor: '#4a148c', bellyColor: '#e1bee7', beakColor: '#FFD740', accessory: 'antenna', unlock: { type: 'plays',  value: 50 } },
+      { id: 5, name: 'Ash',      bodyColor: '#78909c', wingColor: '#37474f', bellyColor: '#eceff1', beakColor: '#FF8C00', accessory: 'cap', unlock: { type: 'plays',  value: 100} },
+      { id: 6, name: 'Rose',     bodyColor: '#f06292', wingColor: '#880e4f', bellyColor: '#fce4ec', beakColor: '#FFD740', accessory: 'bow', unlock: { type: 'combo',  value: 3  } },
+      { id: 7, name: 'Midnight', bodyColor: '#1a237e', wingColor: '#050e3a', bellyColor: '#9fa8da', beakColor: '#FFD740', accessory: 'crown', unlock: { type: 'combo',  value: 8  } },
+    ];
+
+    function isSkinUnlocked(skin) {
+      const u = skin.unlock;
+      if (u.type === 'default') return true;
+      if (u.type === 'score')   return Stats.bestScore  >= u.value;
+      if (u.type === 'plays')   return Stats.totalPlays >= u.value;
+      if (u.type === 'combo')   return Stats.bestCombo  >= u.value;
+      return false;
+    }
+
+    function unlockLabel(skin) {
+      const u = skin.unlock;
+      if (u.type === 'default') return 'DEFAULT';
+      if (u.type === 'score')   return `SCORE ${u.value}`;
+      if (u.type === 'plays')   return `PLAY ${u.value}x`;
+      if (u.type === 'combo')   return `COMBO ${u.value}x`;
+      return '';
+    }
+
+    // ─── SOUND MANAGER ─────────────────────────────────────────────────────────
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this._init();
+      }
+      _init() {
+        try {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) { this.ctx = null; }
+      }
+      _resume() {
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      _osc(type, freq, startTime, endTime, gainPeak = 0.35, freqEnd = null) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        if (freqEnd !== null) osc.frequency.exponentialRampToValueAtTime(freqEnd, endTime);
+        gain.gain.setValueAtTime(gainPeak, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(startTime);
+        osc.stop(endTime);
+      }
+      playJump() {
+        this._resume();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        this._osc('sine', 380, t, t + 0.12, 0.3, 600);
+      }
+      playScore() {
+        this._resume();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        this._osc('sine', 880, t, t + 0.07, 0.25, 1100);
+        this._osc('sine', 1320, t + 0.07, t + 0.18, 0.2, 1320);
+      }
+      playHit() {
+        this._resume();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        // Low thud
+        this._osc('sawtooth', 180, t, t + 0.22, 0.45, 60);
+        // Noise burst via buffer
+        try {
+          const bufLen = Math.floor(this.ctx.sampleRate * 0.18);
+          const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+          const src = this.ctx.createBufferSource();
+          const gain = this.ctx.createGain();
+          const filt = this.ctx.createBiquadFilter();
+          filt.type = 'lowpass'; filt.frequency.value = 320;
+          src.buffer = buf;
+          gain.gain.setValueAtTime(0.5, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          src.connect(filt); filt.connect(gain); gain.connect(this.ctx.destination);
+          src.start(t); src.stop(t + 0.22);
+        } catch (e) { }
+      }
+      playClick() {
+        this._resume();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        this._osc('sine', 660, t, t + 0.07, 0.18, 880);
+      }
+      // Bright 3-note arpeggio for PERFECT hits
+      playPerfect() {
+        this._resume();
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        this._osc('sine', 1047, t,        t + 0.09,  0.26, 1319); // C6→E6
+        this._osc('sine', 1319, t + 0.07, t + 0.16,  0.22, 1568); // E6→G6
+        this._osc('sine', 1568, t + 0.14, t + 0.26,  0.20, 2093); // G6→C7
+      }
+    }
+
+    // ─── BIRD ──────────────────────────────────────────────────────────────────
+    class Bird {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = BIRD_X;
+        this.y = CANVAS_H / 2 - 50;
+        this.vy = 0;
+        this.angle = 0;        // radians
+        this.alive = true;
+        this.floatT = 0;        // for Get Ready float animation
+        this.wingT = 0;
+        this.radius = 16;       // hitbox radius (slightly forgiving)
+      }
+      jump() {
+        this.vy = JUMP_VEL;
+      }
+      update(state, dt) {
+        this.wingT += dt * 0.012;
+        if (state === STATES.READY || state === STATES.MENU) {
+          this.floatT += dt * 0.003;
+          this.y = CANVAS_H / 2 - 50 + Math.sin(this.floatT) * 12;
+          this.angle = Math.sin(this.floatT) * 0.15;
+          return;
+        }
+        if (!this.alive) return;
+
+        this.vy += GRAVITY;
+        if (this.vy > 14) this.vy = 14;
+        this.y += this.vy;
+
+        // Rotation: tilt up when rising, tilt down (max 90°) when falling
+        const targetAngle = this.vy < 0
+          ? -0.44          // ~-25deg
+          : Math.min(this.vy / 14 * Math.PI / 2, Math.PI / 2);
+        this.angle += (targetAngle - this.angle) * 0.12;
+      }
+      draw(ctx, skinOverride) {
+        const skin = skinOverride || SKINS[Stats.selectedSkin] || SKINS[0];
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+
+        const r = 16;
+        
+        if (skin.accessory === 'horns') {
+            // Devil tail
+            ctx.beginPath();
+            ctx.moveTo(-16, 5);
+            ctx.quadraticCurveTo(-26, 12, -32, -2);
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // Spade tip
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.moveTo(-32, -2);
+            ctx.lineTo(-35, -5);
+            ctx.lineTo(-38, -2);
+            ctx.lineTo(-35, 2);
+            ctx.fill();
+        }
+
+        // Body
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r + 2, r, 0, 0, Math.PI * 2);
+        ctx.fillStyle = skin.bodyColor;
+        ctx.fill();
+        ctx.strokeStyle = _darken(skin.bodyColor, 0.7);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Belly
+        ctx.beginPath();
+        ctx.ellipse(4, 4, 9, 7, 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = skin.bellyColor;
+        ctx.fill();
+
+        // Wing (animated flap)
+        const wingY = Math.sin(this.wingT) * 5;
+        if (skin.accessory === 'horns') {
+            // Bat wing
+            ctx.fillStyle = skin.wingColor;
+            ctx.beginPath();
+            ctx.moveTo(3, 2 + wingY);
+            ctx.quadraticCurveTo(-2, -6 + wingY, -12, -4 + wingY);
+            ctx.lineTo(-14, 2 + wingY);
+            ctx.quadraticCurveTo(-10, 4 + wingY, -8, 8 + wingY);
+            ctx.quadraticCurveTo(-4, 5 + wingY, -1, 9 + wingY);
+            ctx.quadraticCurveTo(0, 5 + wingY, 3, 2 + wingY);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.ellipse(-5, 4 + wingY, 10, 5, -0.4, 0, Math.PI * 2);
+            ctx.fillStyle = skin.wingColor;
+            ctx.strokeStyle = _darken(skin.wingColor, 0.7);
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // Eye (white sclera)
+        ctx.beginPath();
+        ctx.arc(8, -5, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Pupil
+        ctx.beginPath();
+        ctx.arc(9.5, -5, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fill();
+        // Eye shine
+        ctx.beginPath();
+        ctx.arc(10.5, -6.5, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        // Beak
+        ctx.beginPath();
+        ctx.moveTo(14, -2);
+        ctx.lineTo(24, 1);
+        ctx.lineTo(14, 5);
+        ctx.closePath();
+        ctx.fillStyle = skin.beakColor;
+        ctx.fill();
+        ctx.strokeStyle = _darken(skin.beakColor, 0.7);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Cheek blush
+        ctx.beginPath();
+        ctx.arc(9, 3, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,100,100,0.25)';
+        ctx.fill();
+
+        // ── Accessories ──
+        if (skin.accessory === 'halo') {
+           ctx.beginPath();
+           ctx.ellipse(0, -18, 9, 3, 0, 0, Math.PI * 2);
+           ctx.strokeStyle = 'rgba(255,235,59,0.8)';
+           ctx.lineWidth = 2.5;
+           ctx.stroke();
+        } else if (skin.accessory === 'horns') {
+           // Small sharp red triangles (Devil Horns)
+           ctx.fillStyle = '#e53935';
+           ctx.beginPath(); // Left horn
+           ctx.moveTo(-6, -14); ctx.lineTo(-8, -22); ctx.lineTo(-2, -15); ctx.fill();
+           ctx.beginPath(); // Right horn
+           ctx.moveTo(4, -13); ctx.lineTo(6, -21); ctx.lineTo(10, -12); ctx.fill();
+        } else if (skin.accessory === 'glasses') {
+           // Cool black shades
+           ctx.fillStyle = '#222';
+           ctx.beginPath();
+           ctx.fillRect(3, -9, 11, 5); // front lens
+           ctx.fillRect(-4, -9, 5, 5); // back lens
+           ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5;
+           ctx.beginPath(); ctx.moveTo(3,-6); ctx.lineTo(-4,-6); ctx.stroke(); // bridge
+           ctx.beginPath(); ctx.moveTo(14,-6); ctx.lineTo(18,-6); ctx.stroke(); // arm
+        } else if (skin.accessory === 'antenna') {
+           // Alien antenna
+           ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(0, -22);
+           ctx.strokeStyle = '#00e676'; ctx.lineWidth = 2; ctx.stroke();
+           ctx.beginPath(); ctx.arc(0, -24, 3.5, 0, Math.PI*2); ctx.fillStyle = '#00e676'; ctx.fill();
+        } else if (skin.accessory === 'cap') {
+           // Baseball cap
+           ctx.fillStyle = '#ff5722';
+           ctx.beginPath(); ctx.arc(0, -11, 10, Math.PI, 0); ctx.fill();
+           ctx.fillRect(0, -14, 16, 3); // Brim
+        } else if (skin.accessory === 'bow') {
+           // Contrast bright cyan bow
+           ctx.fillStyle = '#00e5ff';
+           ctx.strokeStyle = '#008ba3';
+           ctx.lineWidth = 1;
+           ctx.beginPath(); ctx.moveTo(-4,-14); ctx.lineTo(-11,-19); ctx.lineTo(-11,-9); ctx.closePath(); ctx.fill(); ctx.stroke();
+           ctx.beginPath(); ctx.moveTo(-4,-14); ctx.lineTo(3,-19); ctx.lineTo(3,-9); ctx.closePath(); ctx.fill(); ctx.stroke();
+           ctx.beginPath(); ctx.arc(-4, -14, 2.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        } else if (skin.accessory === 'crown') {
+           // Golden crown
+           ctx.fillStyle = '#ffd54f';
+           ctx.beginPath();
+           ctx.moveTo(-10, -11);
+           ctx.lineTo(8, -11);
+           ctx.lineTo(12, -22);
+           ctx.lineTo(3, -16);
+           ctx.lineTo(-1, -24);
+           ctx.lineTo(-5, -16);
+           ctx.lineTo(-14, -22);
+           ctx.fill();
+           ctx.strokeStyle = '#ff8f00';
+           ctx.lineWidth = 1;
+           ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+      getHitbox() {
+        return { x: this.x, y: this.y, r: this.radius - 3 };
+      }
+    }
+
+    // Helper: multiply hex color brightness
+    function _darken(hex, factor) {
+      try {
+        let r = parseInt(hex.slice(1, 3), 16);
+        let g = parseInt(hex.slice(3, 5), 16);
+        let b = parseInt(hex.slice(5, 7), 16);
+        return `rgb(${Math.round(r*factor)},${Math.round(g*factor)},${Math.round(b*factor)})`;
+      } catch(e) { return hex; }
+    }
+
+    // ─── PIPE ──────────────────────────────────────────────────────────────────
+    class Pipe {
+      constructor(x) {
+        const minY = 80, maxY = CANVAS_H - GROUND_H - PIPE_GAP - 80;
+        this.gapY = minY + Math.random() * (maxY - minY);
+        this.x = x;
+        this.w = PIPE_WIDTH;
+        this.scored = false;
+      }
+      update() { this.x -= PIPE_SPEED; }
+      isOffScreen() { return this.x + this.w < -10; }
+      draw(ctx) {
+        const capH = 22, capW = this.w + 10;
+        const gapTop = this.gapY;
+        const gapBot = this.gapY + PIPE_GAP;
+
+        // === TOP PIPE ===
+        this._drawPipeBody(ctx, this.x, 0, this.w, gapTop - capH);
+        this._drawCap(ctx, this.x - 5, gapTop - capH, capW, capH);
+
+        // === BOTTOM PIPE ===
+        const botTop = gapBot + capH;
+        this._drawPipeBody(ctx, this.x, botTop, this.w, CANVAS_H - GROUND_H - botTop);
+        this._drawCap(ctx, this.x - 5, gapBot, capW, capH);
+      }
+      _drawPipeBody(ctx, x, y, w, h) {
+        if (h <= 0) return;
+        const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+        grad.addColorStop(0, '#3a9e38');
+        grad.addColorStop(0.3, '#5ecf5a');
+        grad.addColorStop(0.7, '#4abf47');
+        grad.addColorStop(1, '#2a7e28');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#1e6e1c';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(x + 6, y, 6, h);
+      }
+      _drawCap(ctx, x, y, w, h) {
+        const capGrad = ctx.createLinearGradient(x, 0, x + w, 0);
+        capGrad.addColorStop(0, '#2e8c2c');
+        capGrad.addColorStop(0.3, '#5ecf5a');
+        capGrad.addColorStop(0.7, '#4abf47');
+        capGrad.addColorStop(1, '#1e6e1c');
+        ctx.fillStyle = capGrad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#1a5e18';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(x + 8, y + 4, 8, h - 8);
+      }
+      collides(bird) {
+        const hb = bird.getHitbox();
+        const capW = this.w + 10;
+        const capX = this.x - 5;
+        if (this._circleRect(hb.x, hb.y, hb.r, capX, 0, capW, this.gapY)) return true;
+        if (this._circleRect(hb.x, hb.y, hb.r, capX, this.gapY + PIPE_GAP, capW, CANVAS_H)) return true;
+        return false;
+      }
+      _circleRect(cx, cy, cr, rx, ry, rw, rh) {
+        const nearX = Math.max(rx, Math.min(cx, rx + rw));
+        const nearY = Math.max(ry, Math.min(cy, ry + rh));
+        const dx = cx - nearX, dy = cy - nearY;
+        return dx * dx + dy * dy < cr * cr;
+      }
+      isPassed(birdX) {
+        return !this.scored && birdX > this.x + this.w;
+      }
+      // True when the bird's Y is within PERFECT_ZONE of the gap centre
+      isPerfect(birdY) {
+        const gapCenter = this.gapY + PIPE_GAP / 2;
+        return Math.abs(birdY - gapCenter) <= PERFECT_ZONE;
+      }
+    }
+
+    // ─── ENVIRONMENT ───────────────────────────────────────────────────────────
+    class Environment {
+      constructor(canvas) {
+        this.groundOffset = 0;
+        this.cloudOffset = 0;
+        this._buildCityscape(canvas);
+      }
+      _buildCityscape(canvas) {
+        this.buildings = [];
+        let x = 0;
+        while (x < CANVAS_W + 120) {
+          const w = 30 + Math.random() * 60;
+          const h = 40 + Math.random() * 100;
+          this.buildings.push({ x, w, h });
+          x += w + 4 + Math.random() * 10;
+        }
+        this.clouds = [];
+        const numClouds = 5;
+        const sectionW = (CANVAS_W + 100) / numClouds;
+        for (let i = 0; i < numClouds; i++) {
+          this.clouds.push({
+            x: i * sectionW + Math.random() * (sectionW * 0.4),
+            y: 110 + Math.random() * 90, // lowered so they don't block HUD score
+            r: 22 + Math.random() * 24
+          });
+        }
+      }
+      update(state, dt) {
+        if (state === STATES.PLAYING) {
+          this.groundOffset = (this.groundOffset + PIPE_SPEED * 2.1) % 40;
+          this.cloudOffset = (this.cloudOffset + 0.35) % (CANVAS_W + 100);
+        } else if (state === STATES.READY || state === STATES.MENU) {
+          this.groundOffset = (this.groundOffset + 1.6) % 40;
+        }
+      }
+      draw(ctx) {
+        const skyH = CANVAS_H - GROUND_H;
+
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, skyH);
+        skyGrad.addColorStop(0, '#4fc3f7');
+        skyGrad.addColorStop(0.6, '#81d4fa');
+        skyGrad.addColorStop(1, '#b3e5fc');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, CANVAS_W, skyH);
+
+        const sunGrad = ctx.createRadialGradient(340, 60, 5, 340, 60, 55);
+        sunGrad.addColorStop(0, 'rgba(255,240,150,0.55)');
+        sunGrad.addColorStop(0.5, 'rgba(255,220,80,0.2)');
+        sunGrad.addColorStop(1, 'rgba(255,220,80,0)');
+        ctx.fillStyle = sunGrad;
+        ctx.fillRect(285, 5, 110, 110);
+
+        this.clouds.forEach(c => {
+          ctx.save();
+          ctx.globalAlpha = 0.82;
+          ctx.fillStyle = '#ffffffdd';
+          this._drawCloud(ctx, c.x, c.y, c.r);
+          ctx.restore();
+        });
+
+        ctx.fillStyle = 'rgba(160, 220, 160, 0.55)';
+        this.buildings.forEach(b => {
+          const by = skyH - b.h;
+          ctx.fillRect(b.x, by, b.w, b.h);
+          ctx.fillStyle = 'rgba(255,255,180,0.35)';
+          for (let wy = by + 8; wy < skyH - 10; wy += 14) {
+            for (let wx = b.x + 6; wx < b.x + b.w - 6; wx += 12) {
+              ctx.fillRect(wx, wy, 5, 7);
+            }
+          }
+          ctx.fillStyle = 'rgba(160, 220, 160, 0.55)';
+        });
+
+        this._drawGround(ctx);
+      }
+      _drawCloud(ctx, x, y, r) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.arc(x + r, y - r * 0.4, r * 0.7, 0, Math.PI * 2);
+        ctx.arc(x - r, y, r * 0.65, 0, Math.PI * 2);
+        ctx.arc(x + r * 0.5, y + r * 0.3, r * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      _drawGround(ctx) {
+        const y = CANVAS_H - GROUND_H;
+
+        const gGrad = ctx.createLinearGradient(0, y, 0, CANVAS_H);
+        gGrad.addColorStop(0, '#8B6914');
+        gGrad.addColorStop(0.15, '#a07d20');
+        gGrad.addColorStop(0.16, '#6ea832');
+        gGrad.addColorStop(0.3, '#5d9929');
+        gGrad.addColorStop(1, '#4a7a1e');
+        ctx.fillStyle = gGrad;
+        ctx.fillRect(0, y, CANVAS_W, GROUND_H);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, y + 14, CANVAS_W, GROUND_H - 14);
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+        ctx.lineWidth = 8;
+        const stripeSpacing = 40;
+        const off = this.groundOffset;
+        for (let i = -stripeSpacing; i < CANVAS_W + GROUND_H + stripeSpacing; i += stripeSpacing) {
+          ctx.beginPath();
+          ctx.moveTo(i - GROUND_H + off, y + 14);
+          ctx.lineTo(i + off, y + 14 + GROUND_H);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.fillStyle = '#6abe30';
+        ctx.fillRect(0, y, CANVAS_W, 14);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(0, y, CANVAS_W, 4);
+      }
+    }
+
+    // ─── PARTICLE SYSTEM ───────────────────────────────────────────────────────
+    class Particle {
+      constructor(x, y) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = (Math.random() - 0.5) * 6 - 2;
+        this.alpha = 1;
+        this.size = 4 + Math.random() * 6;
+        this.color = ['#FFD700', '#FF8C00', '#FFFFFF', '#FF6B6B'][Math.floor(Math.random() * 4)];
+        this.life = 1;
+        this.decay = 0.03 + Math.random() * 0.02;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.25;
+        this.life -= this.decay;
+        this.alpha = this.life;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      isDead() { return this.life <= 0; }
+    }
+
+    // ─── FLOATING TEXT ──────────────────────────────────────────────────────────
+    class FloatingText {
+      constructor(x, y, text, color, size = 12) {
+        this.x = x; this.y = y;
+        this.text = text;
+        this.color = color;
+        this.size = size;
+        this.life = 1.0;
+        this.vy = -1.8;  // floats upward
+      }
+      update() {
+        this.y  += this.vy;
+        this.vy *= 0.90;        // decelerate
+        this.life -= 0.022;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.shadowColor  = 'rgba(0,0,0,0.65)';
+        ctx.shadowBlur   = 6;
+        ctx.font         = `bold ${this.size}px "Press Start 2P", monospace`;
+        ctx.textAlign    = 'center';
+        ctx.fillStyle    = this.color;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+      }
+      isDead() { return this.life <= 0; }
+    }
+
+    // ─── LEADERBOARD RENDERER ──────────────────────────────────────────────────
+    class LeaderboardRenderer {
+      constructor() {
+        this._data   = [];    // array of rank objects from API
+        this._status = 'idle'; // 'idle' | 'loading' | 'loaded' | 'error'
+        this._glowT  = 0;
+        this._scrollY = 0;
+      }
+
+      async load() {
+        this._status = 'loading';
+        try {
+          this._data   = await ApiClient.getLeaderboard();
+          this._status = 'loaded';
+        } catch {
+          this._status = 'error';
+        }
+      }
+
+      update(dt) {
+        this._glowT += dt * 0.004;
+      }
+
+      // Returns true if (px, py) is inside the back button
+      hitTestBack(px, py) {
+        return px >= 20 && px <= 100 && py >= 22 && py <= 52;
+      }
+
+      draw(ctx, playerUsername) {
+        // Background
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+        bgGrad.addColorStop(0, 'rgba(10,12,40,0.92)');
+        bgGrad.addColorStop(1, 'rgba(5,8,30,0.96)');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+        // ── Back button ──────────────────────────────────────────────────────
+        ctx.save();
+        ctx.fillStyle = 'rgba(79,195,247,0.18)';
+        ctx.strokeStyle = 'rgba(79,195,247,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(20, 22, 80, 30, 8); ctx.fill(); ctx.stroke();
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#4fc3f7';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('◀ BACK', 60, 38);
+        ctx.restore();
+
+        // ── Title ────────────────────────────────────────────────────────────
+        ctx.save();
+        const glowAlpha = 0.4 + 0.3 * Math.sin(this._glowT * 2.5);
+        ctx.shadowColor = `rgba(255,215,0,${glowAlpha})`;
+        ctx.shadowBlur = 20;
+
+        // Measure text width to centre trophy + label together
+        ctx.font = 'bold 16px "Press Start 2P", monospace';
+        const labelW = ctx.measureText('LEADERBOARD').width;
+        const trophySize = 32;          // trophy font size
+        const gap = 4;                  // gap between trophy and text
+        const totalW = trophySize + gap + labelW;
+        const startX = CANVAS_W / 2 - totalW / 2;
+
+        // Trophy — larger serif so it renders big
+        ctx.font = `${trophySize}px serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('\ud83c\udfc6', startX, 44);
+
+        // "LEADERBOARD" label
+        ctx.font = 'bold 16px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('LEADERBOARD', startX + trophySize + gap, 44);
+
+        ctx.shadowBlur = 0;
+        ctx.textBaseline = 'alphabetic';
+        ctx.restore();
+
+        const tableTop = 80;
+        const rowH     = 44;
+        const padX     = 20;
+
+        // ── Header row ───────────────────────────────────────────────────────
+        ctx.save();
+        ctx.fillStyle = 'rgba(79,195,247,0.12)';
+        ctx.fillRect(padX, tableTop, CANVAS_W - padX * 2, 28);
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = 'rgba(144,202,249,0.85)';
+        ctx.textAlign = 'left';
+        ctx.fillText('#   PLAYER', padX + 10, tableTop + 19);
+        ctx.textAlign = 'right';
+        ctx.fillText('SCORE  COMBO', CANVAS_W - padX - 8, tableTop + 19);
+        ctx.restore();
+
+        // ── Status messages ───────────────────────────────────────────────────
+        if (this._status === 'loading') {
+          ctx.save();
+          ctx.font = '9px "Press Start 2P", monospace';
+          ctx.fillStyle = '#4fc3f7';
+          ctx.textAlign = 'center';
+          ctx.fillText('Loading...', CANVAS_W / 2, tableTop + 80);
+          ctx.restore();
+          return;
+        }
+        if (this._status === 'error') {
+          ctx.save();
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.fillStyle = '#ff6b6b';
+          ctx.textAlign = 'center';
+          ctx.fillText('SERVER OFFLINE', CANVAS_W / 2, tableTop + 60);
+          ctx.font = '7px "Press Start 2P", monospace';
+          ctx.fillStyle = '#90caf9';
+          ctx.fillText('Check backend is running', CANVAS_W / 2, tableTop + 82);
+          ctx.restore();
+          return;
+        }
+        if (this._status === 'loaded' && this._data.length === 0) {
+          ctx.save();
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.fillStyle = '#90caf9';
+          ctx.textAlign = 'center';
+          ctx.fillText('No scores yet!', CANVAS_W / 2, tableTop + 70);
+          ctx.fillText('Be the first to play.', CANVAS_W / 2, tableTop + 92);
+          ctx.restore();
+          return;
+        }
+
+        // ── Rows ─────────────────────────────────────────────────────────────
+        const medals = ['🥇','🥈','🥉'];
+        const maxVisible = Math.floor((CANVAS_H - tableTop - 110) / rowH);
+        const rows = this._data.slice(0, maxVisible);
+
+        rows.forEach((entry, i) => {
+          const ry = tableTop + 28 + i * rowH;
+          const isMe = entry.username === playerUsername;
+
+          ctx.save();
+
+          // Row background
+          if (isMe) {
+            ctx.fillStyle = 'rgba(67,233,123,0.14)';
+            ctx.strokeStyle = 'rgba(67,233,123,0.4)';
+          } else if (i % 2 === 0) {
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.strokeStyle = 'transparent';
+          } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.02)';
+            ctx.strokeStyle = 'transparent';
+          }
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.roundRect(padX, ry, CANVAS_W - padX * 2, rowH - 4, 6);
+          ctx.fill();
+          if (isMe) ctx.stroke();
+
+          // Rank badge
+          const medal = medals[i] || null;
+          ctx.font = '9px "Press Start 2P", monospace';
+          if (medal) {
+            ctx.font = '14px serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(medal, padX + 8, ry + rowH * 0.58);
+          } else {
+            ctx.fillStyle = 'rgba(180,200,255,0.6)';
+            ctx.textAlign = 'left';
+            ctx.fillText(`#${entry.rank}`, padX + 8, ry + rowH * 0.58);
+          }
+
+          // Username
+          ctx.font = '9px "Press Start 2P", monospace';
+          ctx.fillStyle = isMe ? '#43e97b' : '#ffffff';
+          ctx.textAlign = 'left';
+          const displayName = entry.username.length > 10
+            ? entry.username.slice(0, 9) + '…'
+            : entry.username;
+          ctx.fillText(displayName, padX + 44, ry + rowH * 0.58);
+
+          // Score
+          ctx.font = 'bold 11px "Press Start 2P", monospace';
+          ctx.fillStyle = i === 0 ? '#ffd700' : (isMe ? '#7fffb3' : '#e0e0e0');
+          ctx.textAlign = 'right';
+          ctx.fillText(entry.bestScore, CANVAS_W - padX - 60, ry + rowH * 0.58);
+
+          // Combo
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.fillStyle = 'rgba(180,220,255,0.7)';
+          ctx.fillText(`×${entry.bestCombo}`, CANVAS_W - padX - 8, ry + rowH * 0.58);
+
+          ctx.restore();
+        });
+
+        // ── Online badge ─────────────────────────────────────────────────────
+        ctx.save();
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = ApiClient._online ? 'rgba(67,233,123,0.7)' : 'rgba(255,107,107,0.7)';
+        ctx.fillText(
+          ApiClient._online ? '● LIVE' : '○ OFFLINE',
+          CANVAS_W / 2,
+          CANVAS_H - 20
+        );
+        ctx.restore();
+      }
+    }
+
+    // ─── MENU RENDERER ─────────────────────────────────────────────────────────
+    class MenuRenderer {
+      constructor() {
+        // Layout
+        this.COLS      = 4;
+        this.ROWS      = 2;
+        this.BOX_W     = 82;
+        this.BOX_H     = 96;
+        this.GAP       = 12;
+        this.GRID_TOP  = 130;
+        this.BTN_Y     = 500;
+        this.BTN_W     = 220;
+        this.BTN_H     = 50;
+        this.LB_BTN_Y  = 560;
+        this.LB_BTN_W  = 220;
+        this.LB_BTN_H  = 50;
+        this.DC_BTN_Y  = 620;
+        this.DC_BTN_W  = 220;
+        this.DC_BTN_H  = 44;
+
+        // Hover / press animation state per box + button
+        this._hoverIdx   = -1;
+        this._pressScale = 1;   // for PLAY button press anim
+        this._glowT      = 0;   // time counter for glow pulse
+
+        // Tiny preview bird (shared, stateless draw)
+        this._previewBird = new Bird();
+
+        // Unlock pop animations: Map<skinId, { scale, active }>
+        this._unlockAnims  = new Map();
+        // Track previously-unlocked set to detect transitions
+        this._prevUnlocked = new Set(
+          SKINS.filter(s => isSkinUnlocked(s)).map(s => s.id)
+        );
+      }
+
+      // Returns pixel rect for skin box i
+      _boxRect(i) {
+        const col = i % this.COLS;
+        const row = Math.floor(i / this.COLS);
+        const totalW = this.COLS * this.BOX_W + (this.COLS - 1) * this.GAP;
+        const startX = (CANVAS_W - totalW) / 2;
+        const x = startX + col * (this.BOX_W + this.GAP);
+        const y = this.GRID_TOP + row * (this.BOX_H + this.GAP);
+        return { x, y, w: this.BOX_W, h: this.BOX_H };
+      }
+
+      // Returns rect for PLAY button
+      _btnRect() {
+        return {
+          x: (CANVAS_W - this.BTN_W) / 2,
+          y: this.BTN_Y,
+          w: this.BTN_W,
+          h: this.BTN_H
+        };
+      }
+
+      update(dt) {
+        this._glowT += dt * 0.004;
+
+        // Detect newly unlocked skins and start pop animations
+        for (const skin of SKINS) {
+          if (!this._prevUnlocked.has(skin.id) && isSkinUnlocked(skin)) {
+            this._prevUnlocked.add(skin.id);
+            this._unlockAnims.set(skin.id, { scale: 0, active: true });
+          }
+        }
+
+        // Advance active pop animations (scale 0 → 1.2 → 1)
+        this._unlockAnims.forEach((anim, id) => {
+          if (anim.active) {
+            anim.scale += dt * 0.006;   // rises to 1 in ~167ms
+            if (anim.scale >= 1.2) { anim.scale = 1.2; anim.overshoot = true; }
+            if (anim.overshoot) {
+              anim.scale -= dt * 0.004;
+              if (anim.scale <= 1) { anim.scale = 1; anim.active = false; }
+            }
+          }
+        });
+      }
+
+      draw(ctx, selectedIdx) {
+        // ── Background overlay ──────────────────────────────────────────────
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+        bgGrad.addColorStop(0, 'rgba(10,12,40,0.82)');
+        bgGrad.addColorStop(1, 'rgba(5,8,30,0.88)');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+        // ── Title ───────────────────────────────────────────────────────────
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        // Title glow
+        const glowAlpha = 0.4 + 0.3 * Math.sin(this._glowT * 2.5);
+        ctx.shadowColor = `rgba(100,220,255,${glowAlpha})`;
+        ctx.shadowBlur = 22;
+        ctx.font = 'bold 20px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('SELECT SKIN', CANVAS_W / 2, 68);
+        ctx.shadowBlur = 0;
+
+        // Subtitle stats bar
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = 'rgba(180,220,255,0.75)';
+        ctx.fillText(
+          `BEST: ${Stats.bestScore}  |  PLAYS: ${Stats.totalPlays}  |  DEATHS: ${Stats.totalDeaths}`,
+          CANVAS_W / 2, 95
+        );
+
+        // Separator
+        const sepGrad = ctx.createLinearGradient(20, 0, CANVAS_W - 20, 0);
+        sepGrad.addColorStop(0, 'transparent');
+        sepGrad.addColorStop(0.2, 'rgba(100,200,255,0.45)');
+        sepGrad.addColorStop(0.8, 'rgba(100,200,255,0.45)');
+        sepGrad.addColorStop(1, 'transparent');
+        ctx.strokeStyle = sepGrad;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(20, 108); ctx.lineTo(CANVAS_W - 20, 108);
+        ctx.stroke();
+
+        ctx.restore();
+
+        // ── Skin grid ───────────────────────────────────────────────────────
+        for (let i = 0; i < SKINS.length; i++) {
+          this._drawSkinBox(ctx, i, selectedIdx);
+        }
+
+        // ── PLAY button ─────────────────────────────────────────────────────
+        this._drawPlayBtn(ctx);
+
+        // ── Leaderboard button ───────────────────────────────────────────────
+        this._drawLeaderboardBtn(ctx);
+
+        // ── Daily Challenge button ────────────────────────────────────────────
+        this._drawDailyBtn(ctx);
+
+      }
+
+      _drawSkinBox(ctx, i, selectedIdx) {
+        const { x, y, w, h } = this._boxRect(i);
+        const skin     = SKINS[i];
+        const unlocked = isSkinUnlocked(skin);
+        const isSelected = (i === selectedIdx);
+        const isHovered  = (i === this._hoverIdx);
+        const anim = this._unlockAnims.get(skin.id);
+        const popScale = anim ? anim.scale : (unlocked ? 1 : 0);
+
+        ctx.save();
+
+        // ── Card background ────────────────────────────────────────────────
+        const cardGrad = ctx.createLinearGradient(x, y, x, y + h);
+        if (isSelected) {
+          cardGrad.addColorStop(0, 'rgba(50,140,255,0.42)');
+          cardGrad.addColorStop(1, 'rgba(20,60,190,0.52)');
+        } else if (!unlocked) {
+          cardGrad.addColorStop(0, 'rgba(20,20,50,0.70)');
+          cardGrad.addColorStop(1, 'rgba(10,10,35,0.75)');
+        } else if (isHovered) {
+          cardGrad.addColorStop(0, 'rgba(255,255,255,0.15)');
+          cardGrad.addColorStop(1, 'rgba(255,255,255,0.07)');
+        } else {
+          cardGrad.addColorStop(0, 'rgba(255,255,255,0.09)');
+          cardGrad.addColorStop(1, 'rgba(255,255,255,0.04)');
+        }
+        ctx.fillStyle = cardGrad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 10);
+        ctx.fill();
+
+        // ── Border ────────────────────────────────────────────────────────
+        if (isSelected) {
+          const glowPulse = 0.75 + 0.25 * Math.sin(this._glowT * 3.5);
+          ctx.shadowColor = `rgba(80,210,255,${glowPulse})`;
+          ctx.shadowBlur = 20;
+          ctx.strokeStyle = '#4fc3f7';
+          ctx.lineWidth = 3;
+        } else if (isHovered && unlocked) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 1.5;
+        } else if (!unlocked) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 1;
+        } else {
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.lineWidth = 1;
+        }
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 10);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        const cx = x + w / 2;
+        const previewY = y + h * 0.44;
+
+        if (unlocked) {
+          // ── Unlocked: bird preview (with pop-scale anim) ──────────────────
+          this._previewBird.angle = 0;
+          this._previewBird.wingT = this._glowT * 4;
+
+          ctx.save();
+          ctx.translate(cx, previewY);
+          ctx.scale(popScale * 0.75, popScale * 0.75);
+          ctx.translate(-this._previewBird.x, -this._previewBird.y);
+          this._previewBird.draw(ctx, skin);
+          ctx.restore();
+
+          // Skin name
+          ctx.shadowColor = 'rgba(0,0,0,0.7)';
+          ctx.shadowBlur = 4;
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = isSelected ? '#7ee8ff' : '#ffffff';
+          ctx.fillText(skin.name.toUpperCase(), cx, y + h - 22);
+
+          // Unlock condition (green = met)
+          ctx.font = '7px "Press Start 2P", monospace';
+          ctx.fillStyle = isSelected ? '#a8f0ff' : '#6dffb3';
+          ctx.fillText(unlockLabel(skin), cx, y + h - 8);
+          ctx.shadowBlur = 0;
+
+        } else {
+          // ── Locked: canvas lock icon, NO bird ────────────────────────────
+          this._drawLockIcon(ctx, cx, previewY - 4);
+
+          // Skin name (dimmed)
+          ctx.shadowColor = 'rgba(0,0,0,0.7)';
+          ctx.shadowBlur = 4;
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(200,200,220,0.65)';
+          ctx.fillText(skin.name.toUpperCase(), cx, y + h - 22);
+
+          // Unlock requirement (amber)
+          ctx.font = '7px "Press Start 2P", monospace';
+          ctx.fillStyle = '#ffd54f';
+          ctx.fillText(unlockLabel(skin), cx, y + h - 8);
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.restore();
+      }
+
+      // Canvas-drawn padlock icon (no emoji)
+      _drawLockIcon(ctx, cx, cy) {
+        ctx.save();
+        const bw = 24, bh = 18, br = 5;
+        const bx = cx - bw / 2, by = cy;
+
+        // Lock body
+        ctx.fillStyle = 'rgba(200,210,230,0.80)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, br);
+        ctx.fill();
+        ctx.stroke();
+
+        // Shackle (arc above body)
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(cx, by, 13 / 2, Math.PI, 0, false);
+        ctx.stroke();
+
+        // Keyhole circle
+        ctx.fillStyle = 'rgba(80,90,130,0.9)';
+        ctx.beginPath();
+        ctx.arc(cx, by + bh * 0.42, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Keyhole stem
+        ctx.fillStyle = 'rgba(80,90,130,0.9)';
+        ctx.fillRect(cx - 1.5, by + bh * 0.42, 3, 5);
+
+        ctx.restore();
+      }
+
+      _drawPlayBtn(ctx) {
+        const { x, y, w, h } = this._btnRect();
+        const sc = this._pressScale;
+
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.scale(sc, sc);
+        ctx.translate(-(x + w / 2), -(y + h / 2));
+
+        const pulse = 0.55 + 0.25 * Math.sin(this._glowT * 2.8);
+        ctx.shadowColor = `rgba(67,233,123,${pulse})`;
+        ctx.shadowBlur = 22;
+
+        const btnGrad = ctx.createLinearGradient(x, y, x, y + h);
+        btnGrad.addColorStop(0, '#43e97b');
+        btnGrad.addColorStop(1, '#2ecc71');
+        ctx.fillStyle = btnGrad;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(x + 14, y + h - 10, w - 28, 6);
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.beginPath(); ctx.roundRect(x + 12, y + 6, w - 24, 14, 8); ctx.fill();
+
+        ctx.strokeStyle = '#1a8a4a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.stroke();
+
+        ctx.font = 'bold 13px "Press Start 2P", monospace';
+        ctx.fillStyle = '#003300';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('▶  PLAY', x + w / 2, y + h / 2 + 1);
+        ctx.restore();
+        ctx.textBaseline = 'alphabetic';
+      }
+
+      _drawLeaderboardBtn(ctx) {
+        const x = (CANVAS_W - this.LB_BTN_W) / 2;
+        const y = this.LB_BTN_Y;
+        const w = this.LB_BTN_W;
+        const h = this.LB_BTN_H;
+
+        ctx.save();
+        const pulse = 0.35 + 0.2 * Math.sin(this._glowT * 2.2);
+        ctx.shadowColor = `rgba(255,215,0,${pulse})`;
+        ctx.shadowBlur = 16;
+
+        const lbGrad = ctx.createLinearGradient(x, y, x, y + h);
+        lbGrad.addColorStop(0, 'rgba(255,215,0,0.22)');
+        lbGrad.addColorStop(1, 'rgba(180,140,0,0.18)');
+        ctx.fillStyle = lbGrad;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = 'rgba(255,215,0,0.55)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.stroke();
+
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffd700';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('\uD83C\uDFC6  LEADERBOARD', x + w / 2, y + h / 2 + 1);
+        ctx.restore();
+        ctx.textBaseline = 'alphabetic';
+      }
+
+      _drawDailyBtn(ctx) {
+        const x = (CANVAS_W - this.DC_BTN_W) / 2;
+        const y = this.DC_BTN_Y;
+        const w = this.DC_BTN_W;
+        const h = this.DC_BTN_H;
+
+        ctx.save();
+        const pulse = 0.35 + 0.2 * Math.sin(this._glowT * 1.8 + 1);
+        ctx.shadowColor = `rgba(100,180,255,${pulse})`;
+        ctx.shadowBlur = 14;
+
+        const dcGrad = ctx.createLinearGradient(x, y, x, y + h);
+        dcGrad.addColorStop(0, 'rgba(79,195,247,0.22)');
+        dcGrad.addColorStop(1, 'rgba(30,120,200,0.18)');
+        ctx.fillStyle = dcGrad;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = 'rgba(79,195,247,0.55)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.stroke();
+
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillStyle = '#4fc3f7';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('\uD83D\uDCC5  DAILY', x + w / 2, y + h / 2 + 1);
+        ctx.restore();
+        ctx.textBaseline = 'alphabetic';
+      }
+
+      // Hit-test: returns skin index under (px, py), or -1
+      hitTestSkin(px, py) {
+        for (let i = 0; i < SKINS.length; i++) {
+          const { x, y, w, h } = this._boxRect(i);
+          if (px >= x && px <= x + w && py >= y && py <= y + h) return i;
+        }
+        return -1;
+      }
+
+      // Returns true if (px,py) is inside PLAY button
+      hitTestPlay(px, py) {
+        const { x, y, w, h } = this._btnRect();
+        return px >= x && px <= x + w && py >= y && py <= y + h;
+      }
+
+      // Returns true if (px,py) is inside LEADERBOARD button
+      hitTestLeaderboard(px, py) {
+        const x = (CANVAS_W - this.LB_BTN_W) / 2;
+        const y = this.LB_BTN_Y;
+        return px >= x && px <= x + this.LB_BTN_W && py >= y && py <= y + this.LB_BTN_H;
+      }
+
+      // Returns true if (px,py) is inside DAILY button
+      hitTestDaily(px, py) {
+        const x = (CANVAS_W - this.DC_BTN_W) / 2;
+        const y = this.DC_BTN_Y;
+        return px >= x && px <= x + this.DC_BTN_W && py >= y && py <= y + this.DC_BTN_H;
+      }
+
+      // Call on pointer move to update hover state
+      setHover(px, py) {
+        this._hoverIdx = this.hitTestSkin(px, py);
+      }
+
+      // Press animation
+      triggerPlayPress() {
+        this._pressScale = 0.93;
+        setTimeout(() => { this._pressScale = 1; }, 130);
+      }
+    }
+
+    // ─── DAILY CHALLENGE MANAGER ────────────────────────────────────────────────
+    // Handles all API communication for the daily challenge system.
+    class DailyChallengeManager {
+      constructor() {
+        this._challenges  = [];   // [{ type, target, label, icon }]
+        this._progress    = { score: 0, combo: 0, plays: 0 };
+        this._completed   = [];   // ['score', 'plays', ...]
+        this._date        = '';   // 'YYYY-MM-DD'
+        this._status      = 'idle'; // 'idle' | 'loading' | 'loaded' | 'error'
+        this._newlyCompleted = []; // populated after pushResult, drained after display
+      }
+
+      get challenges()  { return this._challenges; }
+      get progress()    { return this._progress; }
+      get completed()   { return this._completed; }
+      get date()        { return this._date; }
+      get status()      { return this._status; }
+
+      isComplete(ch) {
+        return this._completed.includes(ch.type);
+      }
+
+      progressFor(ch) {
+        return this._progress[ch.type] ?? 0;
+      }
+
+      async load() {
+        this._status = 'loading';
+        try {
+          // Fetch today's challenges
+          const chRes  = await fetch(`${API_BASE}/daily-challenge`);
+          const chData = await chRes.json();
+          this._challenges = chData.challenges || [];
+          this._date       = chData.date || '';
+
+          // Fetch this player's progress (if logged in)
+          if (ApiClient.username) {
+            const prRes  = await fetch(`${API_BASE}/progress/${encodeURIComponent(ApiClient.username)}`);
+            const prData = await prRes.json();
+            this._progress  = prData.progress  || { score: 0, combo: 0, plays: 0 };
+            this._completed = prData.completedChallenges || [];
+          }
+
+          this._status = 'loaded';
+        } catch {
+          this._status = 'error';
+        }
+      }
+
+      // Called once per game-over. Sends { score, combo } to the server.
+      // Server increments plays by 1; only accepts score/combo if better.
+      async pushResult({ score, combo }) {
+        if (!ApiClient.username || !ApiClient.token) return;
+        if (this._status === 'error') return; // server offline
+        try {
+          const res = await fetch(`${API_BASE}/progress`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${ApiClient.token}`,
+            },
+            body: JSON.stringify({ username: ApiClient.username, score, combo }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          this._progress        = data.progress || this._progress;
+          this._completed       = data.completedChallenges || this._completed;
+          this._newlyCompleted  = data.newlyCompleted || [];
+          this._status = 'loaded';
+        } catch {
+          // Server offline — fail silently, existing progress untouched
+        }
+      }
+
+      // Drain newly-completed list (call after displaying notifications)
+      drainNewlyCompleted() {
+        const list = [...this._newlyCompleted];
+        this._newlyCompleted = [];
+        return list;
+      }
+    }
+
+    // ─── DAILY CHALLENGE RENDERER ───────────────────────────────────────────────
+    // Draws the full-screen Daily Challenge panel on the canvas.
+    class DailyChallengeRenderer {
+      constructor(manager) {
+        this._mgr   = manager;
+        this._glowT = 0;
+        // Notification banners: [{ text, life }]
+        this._banners = [];
+      }
+
+      // Returns true if (px, py) is inside the ◀ BACK button
+      hitTestBack(px, py) {
+        return px >= 20 && px <= 100 && py >= 22 && py <= 52;
+      }
+
+      update(dt) {
+        this._glowT += dt * 0.004;
+
+        // Check newly completed challenges from manager and spawn banners
+        const newlyDone = this._mgr.drainNewlyCompleted();
+        for (const type of newlyDone) {
+          this._banners.push({ text: `${type.toUpperCase()} CHALLENGE COMPLETE! ✔`, life: 3.0 });
+        }
+
+        // Decay banners
+        this._banners.forEach(b => { b.life -= dt * 0.001; });
+        this._banners = this._banners.filter(b => b.life > 0);
+      }
+
+      // Push an external banner (e.g. from game-over hook)
+      pushBanner(text) {
+        this._banners.push({ text, life: 3.0 });
+      }
+
+      draw(ctx) {
+        const mgr = this._mgr;
+
+        // ── Background ────────────────────────────────────────────────────────
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+        bgGrad.addColorStop(0, 'rgba(8,14,45,0.96)');
+        bgGrad.addColorStop(1, 'rgba(4,10,30,0.98)');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+        // ── Back button ────────────────────────────────────────────────────────
+        ctx.save();
+        ctx.fillStyle = 'rgba(79,195,247,0.18)';
+        ctx.strokeStyle = 'rgba(79,195,247,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(20, 22, 80, 30, 8); ctx.fill(); ctx.stroke();
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#4fc3f7';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('◀ BACK', 60, 38);
+        ctx.restore();
+
+        // ── Title ──────────────────────────────────────────────────────────────
+        ctx.save();
+        const glowAlpha = 0.4 + 0.3 * Math.sin(this._glowT * 2.5);
+        ctx.shadowColor = `rgba(79,195,247,${glowAlpha})`;
+        ctx.shadowBlur = 20;
+        ctx.font = 'bold 15px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('\uD83D\uDCC5 DAILY CHALLENGE', CANVAS_W / 2, 72);
+        ctx.shadowBlur = 0;
+
+        // Date subtitle
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = 'rgba(144,202,249,0.75)';
+        ctx.fillText(`UTC ${mgr.date || '...'}`, CANVAS_W / 2, 88);
+        ctx.restore();
+
+        // ── Status: loading / error ────────────────────────────────────────────
+        if (mgr.status === 'loading') {
+          ctx.save();
+          ctx.font = '9px "Press Start 2P", monospace';
+          ctx.fillStyle = '#4fc3f7';
+          ctx.textAlign = 'center';
+          ctx.fillText('Loading...', CANVAS_W / 2, 200);
+          ctx.restore();
+          return;
+        }
+        if (mgr.status === 'error') {
+          ctx.save();
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.fillStyle = '#ff6b6b';
+          ctx.textAlign = 'center';
+          ctx.fillText('SERVER OFFLINE', CANVAS_W / 2, 180);
+          ctx.font = '7px "Press Start 2P", monospace';
+          ctx.fillStyle = '#90caf9';
+          ctx.fillText('Check backend is running', CANVAS_W / 2, 202);
+          ctx.restore();
+          return;
+        }
+        if (mgr.status === 'loaded' && mgr.challenges.length === 0) {
+          ctx.save();
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.fillStyle = '#90caf9';
+          ctx.textAlign = 'center';
+          ctx.fillText('No challenges today!', CANVAS_W / 2, 200);
+          ctx.restore();
+          return;
+        }
+
+        // ── Challenge cards ────────────────────────────────────────────────────
+        const cardX = 18;
+        const cardW = CANVAS_W - cardX * 2;
+        const cardH = 100;
+        const cardGap = 14;
+        let cardY = 106;
+
+        mgr.challenges.forEach((ch) => {
+          const done = mgr.isComplete(ch);
+          const current = Math.min(mgr.progressFor(ch), ch.target);
+          const pct     = ch.target > 0 ? current / ch.target : 0;
+
+          ctx.save();
+
+          // Card BG
+          const cg = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+          if (done) {
+            cg.addColorStop(0, 'rgba(67,233,123,0.22)');
+            cg.addColorStop(1, 'rgba(20,100,50,0.28)');
+          } else {
+            cg.addColorStop(0, 'rgba(255,255,255,0.07)');
+            cg.addColorStop(1, 'rgba(255,255,255,0.03)');
+          }
+          ctx.fillStyle = cg;
+          ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 12); ctx.fill();
+
+          // Card border
+          ctx.strokeStyle = done ? 'rgba(67,233,123,0.55)' : 'rgba(79,195,247,0.22)';
+          ctx.lineWidth = done ? 1.5 : 1;
+          ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 12); ctx.stroke();
+
+          // Icon circle
+          ctx.fillStyle = done ? 'rgba(67,233,123,0.30)' : 'rgba(79,195,247,0.20)';
+          ctx.beginPath(); ctx.arc(cardX + 28, cardY + 30, 18, 0, Math.PI * 2); ctx.fill();
+          ctx.font = '16px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = done ? '#43e97b' : '#4fc3f7';
+          ctx.fillText(ch.icon || '\u2605', cardX + 28, cardY + 30);
+
+          // Label
+          ctx.font = '8px "Press Start 2P", monospace';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = done ? '#43e97b' : '#ffffff';
+          // Truncate long labels
+          const label = ch.label.length > 30 ? ch.label.slice(0, 29) + '\u2026' : ch.label;
+          ctx.fillText(label, cardX + 54, cardY + 26);
+
+          // Done badge OR progress bar
+          if (done) {
+            ctx.font = 'bold 9px "Press Start 2P", monospace';
+            ctx.fillStyle = '#43e97b';
+            ctx.fillText('COMPLETE \u2714', cardX + 54, cardY + 48);
+          } else {
+            // Progress fraction text
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.fillStyle = 'rgba(180,220,255,0.8)';
+            ctx.fillText(`${current} / ${ch.target}`, cardX + 54, cardY + 48);
+
+            // Progress bar track
+            const barX = cardX + 54;
+            const barY = cardY + 56;
+            const barW = cardW - 54 - 16;
+            const barH = 10;
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 5); ctx.fill();
+
+            // Progress bar fill
+            if (pct > 0) {
+              const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW * pct, 0);
+              fillGrad.addColorStop(0, '#4fc3f7');
+              fillGrad.addColorStop(1, '#0288d1');
+              ctx.fillStyle = fillGrad;
+              ctx.beginPath(); ctx.roundRect(barX, barY, barW * pct, barH, 5); ctx.fill();
+            }
+          }
+
+          // Type badge (top-right)
+          ctx.font = '6px "Press Start 2P", monospace';
+          ctx.textAlign = 'right';
+          ctx.fillStyle = done ? 'rgba(67,233,123,0.7)' : 'rgba(144,202,249,0.55)';
+          ctx.fillText(ch.type.toUpperCase(), cardX + cardW - 10, cardY + 16);
+
+          ctx.restore();
+          cardY += cardH + cardGap;
+        });
+
+        // ── Overall completion banner ─────────────────────────────────────────
+        const allDone = mgr.challenges.length > 0 &&
+          mgr.challenges.every(ch => mgr.isComplete(ch));
+        if (allDone) {
+          ctx.save();
+          const bannerY = cardY + 8;
+          const glowA = 0.5 + 0.3 * Math.sin(this._glowT * 3);
+          ctx.shadowColor = `rgba(255,215,0,${glowA})`;
+          ctx.shadowBlur = 18;
+          ctx.font = 'bold 10px "Press Start 2P", monospace';
+          ctx.fillStyle = '#ffd700';
+          ctx.textAlign = 'center';
+          ctx.fillText('\uD83C\uDF1F ALL CHALLENGES COMPLETE! \uD83C\uDF1F', CANVAS_W / 2, bannerY);
+          ctx.restore();
+        }
+
+        // ── Notification banners ──────────────────────────────────────────────
+        this._banners.forEach((b, i) => {
+          const alpha = Math.min(b.life, 1);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = 'rgba(67,233,123,0.92)';
+          ctx.beginPath(); ctx.roundRect(20, CANVAS_H - 60 - i * 36, CANVAS_W - 40, 30, 8); ctx.fill();
+          ctx.font = '7px "Press Start 2P", monospace';
+          ctx.fillStyle = '#003300';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(b.text, CANVAS_W / 2, CANVAS_H - 45 - i * 36);
+          ctx.restore();
+        });
+      }
+    }
+
+    // ─── GAME ENGINE ───────────────────────────────────────────────────────────
+    class Game {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.wrapper = document.getElementById('game-wrapper');
+        this.canvas.width = CANVAS_W;
+        this.canvas.height = CANVAS_H;
+
+        this.sound = new SoundManager();
+        this.env = new Environment(this.canvas);
+        this.bird = new Bird();
+        this.pipes = [];
+        this.particles = [];
+
+        this.state = STATES.MENU;
+        this.score = 0;
+        this.hiScore = Stats.bestScore;
+
+        this.lastPipeTime = 0;
+        this.shakeFrames = 0;
+        this.shakeIntensity = 0;
+        this.lastTime = 0;
+        this._inputLocked = false;
+
+        // ── Perfect / Combo ──
+        this.combo         = 0;
+        this.floatingTexts = [];
+
+        // ── Menu + Leaderboard + Daily ──
+        this.menuRenderer     = new MenuRenderer();
+        this.lbRenderer       = new LeaderboardRenderer();
+        this.dailyMgr         = new DailyChallengeManager();
+        this.dailyRenderer    = new DailyChallengeRenderer(this.dailyMgr);
+        this.selectedSkinIdx  = Math.min(Stats.selectedSkin, SKINS.length - 1);
+        if (!isSkinUnlocked(SKINS[this.selectedSkinIdx])) {
+          this.selectedSkinIdx = 0;
+          localStorage.setItem('flappy_skin', 0);
+        }
+        // Load daily challenges in background (non-blocking)
+        this.dailyMgr.load();
+
+        // DOM refs
+        this.hudScore = document.getElementById('hud-score');
+        this.overlayReady = document.getElementById('overlay-ready');
+        this.overlayGameover = document.getElementById('overlay-gameover');
+        this.finalScore = document.getElementById('final-score');
+        this.highScoreEl = document.getElementById('high-score');
+        this.medalArea = document.getElementById('medal-area');
+        this.flashEl = document.getElementById('flash');
+
+        // Hide all HTML overlays – menu/ready rendered on canvas
+        this.hudScore.style.display = 'none';
+        this.overlayReady.classList.add('hidden');
+        this.overlayGameover.classList.add('hidden');
+
+        this._bindEvents();
+        requestAnimationFrame(ts => this._loop(ts));
+      }
+
+      // ─── EVENTS ────────────────────────────────────────────────────────
+      _bindEvents() {
+        // Canvas pointer/touch → unified handler
+        this.canvas.addEventListener('pointerdown', e => {
+          e.preventDefault();
+          const { px, py } = this._canvasXY(e);
+          this._onTap(px, py);
+        }, { passive: false });
+
+        // Pointer move for hover (menu only)
+        this.canvas.addEventListener('pointermove', e => {
+          const { px, py } = this._canvasXY(e);
+          if (this.state === STATES.MENU) {
+            this.menuRenderer.setHover(px, py);
+          }
+        }, { passive: true });
+
+        // Pointer leave → clear hover
+        this.canvas.addEventListener('pointerleave', () => {
+          this.menuRenderer._hoverIdx = -1;
+        }, { passive: true });
+
+        // Keyboard space
+        document.addEventListener('keydown', e => {
+          if (e.code === 'Space') {
+            e.preventDefault();
+            if (this.state === STATES.READY || this.state === STATES.PLAYING) {
+              this._handleInput();
+            }
+          }
+        });
+
+        // Restart / return-to-menu button
+        document.getElementById('btn-restart').addEventListener('click', e => {
+          e.stopPropagation();
+          this._returnToMenu();
+        });
+      }
+
+      // Convert pointer event coords to canvas logical px
+      _canvasXY(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = CANVAS_W / rect.width;
+        const scaleY = CANVAS_H / rect.height;
+        return {
+          px: (e.clientX - rect.left) * scaleX,
+          py: (e.clientY - rect.top)  * scaleY
+        };
+      }
+
+      _onTap(px, py) {
+        if (this.state === STATES.MENU) {
+          // Skin box
+          const hitSkin = this.menuRenderer.hitTestSkin(px, py);
+          if (hitSkin !== -1) {
+            if (isSkinUnlocked(SKINS[hitSkin])) {
+              this.selectedSkinIdx = hitSkin;
+              Stats.selectedSkin = hitSkin;
+              this.sound.playClick();
+            }
+            return;
+          }
+          // Play button
+          if (this.menuRenderer.hitTestPlay(px, py)) {
+            this.menuRenderer.triggerPlayPress();
+            this.sound.playClick();
+            setTimeout(() => this._showReady(), 130);
+            return;
+          }
+          // Leaderboard button
+          if (this.menuRenderer.hitTestLeaderboard(px, py)) {
+            this.sound.playClick();
+            this._openLeaderboard();
+            return;
+          }
+          // Daily Challenge button
+          if (this.menuRenderer.hitTestDaily(px, py)) {
+            this.sound.playClick();
+            this._openDaily();
+            return;
+          }
+          return;
+        }
+
+        if (this.state === STATES.LEADERBOARD) {
+          if (this.lbRenderer.hitTestBack(px, py)) {
+            this.sound.playClick();
+            this.state = STATES.MENU;
+          }
+          return;
+        }
+
+        if (this.state === STATES.DAILY) {
+          if (this.dailyRenderer.hitTestBack(px, py)) {
+            this.sound.playClick();
+            this.state = STATES.MENU;
+          }
+          return;
+        }
+
+        if (this.state === STATES.READY || this.state === STATES.PLAYING) {
+          this._handleInput();
+        }
+      }
+
+      _handleInput() {
+        if (this._inputLocked) return;
+        if (this.state === STATES.READY) {
+          this._startGame();
+          this.bird.jump();
+          this.sound.playJump();
+        } else if (this.state === STATES.PLAYING) {
+          this.bird.jump();
+          this.sound.playJump();
+        }
+      }
+
+      // ─── STATE TRANSITIONS ─────────────────────────────────────────────
+      _returnToMenu() {
+        this.bird.reset();
+        this.pipes = [];
+        this.particles = [];
+        this.floatingTexts = [];
+        this.score = 0;
+        this.combo = 0;
+        this.shakeFrames = 0;
+        this.hasRevived = false;
+        this.invulnerableFrames = 0;
+        this.hudScore.style.display = 'none';
+        this.overlayReady.classList.add('hidden');
+        this.overlayGameover.classList.add('hidden');
+        this.state = STATES.MENU;
+      }
+
+      _showReady() {
+        this.bird.reset();
+        this.pipes = [];
+        this.particles = [];
+        this.floatingTexts = [];
+        this.score = 0;
+        this.combo = 0;
+        this.shakeFrames = 0;
+        this.hasRevived = false;
+        this.invulnerableFrames = 0;
+        this.state = STATES.READY;
+        this._inputLocked = true;
+        this.hudScore.style.display = 'none';
+        this.overlayReady.classList.remove('hidden');
+        this.overlayGameover.classList.add('hidden');
+      }
+
+      _openLeaderboard() {
+        this.state = STATES.LEADERBOARD;
+        this.lbRenderer.load(); // async fetch — renderer shows 'loading' in the meantime
+      }
+
+      _openDaily() {
+        this.state = STATES.DAILY;
+        // Reload progress so it's always fresh when opening the panel
+        this.dailyMgr.load();
+      }
+
+      _startGame() {
+        this.state = STATES.PLAYING;
+        this.overlayReady.classList.add('hidden');
+        this.hudScore.style.display = 'block';
+        this.hudScore.textContent = '0';
+        this.lastPipeTime = performance.now();
+        Stats.recordPlay();
+      }
+
+      _triggerRevive() {
+        this.hasRevived = true;
+        this.invulnerableFrames = 150; // 2.5 seconds of invincibility at 60fps
+        
+        // Boost bird up
+        this.bird.y = Math.min(this.bird.y, CANVAS_H - GROUND_H - 60);
+        this.bird.vy = JUMP_VEL;
+
+        // Clear pipes for a clean slate
+        this.pipes = [];
+        this.lastPipeTime = performance.now();
+
+        // Flash screen white
+        this.flashEl.style.opacity = '1';
+        setTimeout(() => { this.flashEl.style.opacity = '0'; }, 300);
+
+        this.floatingTexts.push(
+            new FloatingText(this.bird.x + 20, this.bird.y - 30, 'REVIVED!', '#00e5ff', 12)
+        );
+        this.sound.playPerfect();
+      }
+
+      _gameOver() {
+        if (!this.bird.alive) return;
+        this.bird.alive = false;
+        this.state = STATES.GAMEOVER;
+        this.sound.playHit();
+
+        // Update stats locally
+        Stats.recordDeath();
+        Stats.recordScore(this.score);
+        this.hiScore = Stats.bestScore;
+
+        // Sync to server in background
+        Stats.syncToServer();
+
+        // ── Daily challenge progress push (one POST per game-over) ──
+        this.dailyMgr.pushResult({
+          score: this.score,
+          combo: this.combo,
+        });
+
+        for (let i = 0; i < 18; i++) this.particles.push(new Particle(this.bird.x, this.bird.y));
+
+        this.shakeFrames = 18;
+        this.shakeIntensity = 7;
+
+        this.flashEl.style.opacity = '0.9';
+        setTimeout(() => { this.flashEl.style.opacity = '0'; }, 80);
+
+        setTimeout(() => {
+          this.overlayGameover.classList.remove('hidden');
+          this.finalScore.textContent = this.score;
+          this.highScoreEl.textContent = this.hiScore;
+          this.medalArea.textContent = this._getMedal(this.score);
+        }, 600);
+      }
+
+      _getMedal(score) {
+        if (score >= 40) return '🏆';
+        if (score >= 20) return '🥇';
+        if (score >= 10) return '🥈';
+        if (score >= 5)  return '🥉';
+        return '🏅';
+      }
+
+      // ─── SCORE ─────────────────────────────────────────────────────────
+      _addPoint(perfect = false) {
+        let pts = 1;
+
+        if (perfect) {
+          // Increment combo (capped)
+          this.combo = Math.min(this.combo + 1, COMBO_MAX);
+          Stats.recordCombo(this.combo);
+          // Score multiplier: +1 base bonus + 0.2 per combo level
+          pts = Math.round(1 * (1 + this.combo * 0.2));
+
+          // Floating label
+          const label = this.combo > 1
+            ? `PERFECT \u00d7${this.combo}`
+            : 'PERFECT!';
+          this.floatingTexts.push(
+            new FloatingText(BIRD_X + 50, this.bird.y - 22, label, '#FFD700', 11)
+          );
+          // Bonus points label (only when > 1)
+          if (pts > 1) {
+            this.floatingTexts.push(
+              new FloatingText(BIRD_X + 50, this.bird.y - 44, `+${pts}`, '#7fffb3', 9)
+            );
+          }
+          this.sound.playPerfect();
+        } else {
+          this.combo = 0;
+          this.sound.playScore();
+        }
+
+        this.score += pts;
+        this.hudScore.textContent = this.score;
+        this.hudScore.classList.remove('pop');
+        void this.hudScore.offsetWidth;
+        this.hudScore.classList.add('pop');
+        setTimeout(() => this.hudScore.classList.remove('pop'), 150);
+      }
+
+      // ─── MAIN LOOP ─────────────────────────────────────────────────────
+      _loop(timestamp) {
+        const dt = Math.min(timestamp - this.lastTime, 50);
+        this.lastTime = timestamp;
+        this._update(timestamp, dt);
+        this._render();
+        requestAnimationFrame(ts => this._loop(ts));
+      }
+
+      _update(timestamp, dt) {
+        if (this._inputLocked) this._inputLocked = false;
+
+        this.env.update(this.state, dt);
+        this.bird.update(this.state, dt);
+
+        if (this.state === STATES.MENU) {
+          this.menuRenderer.update(dt);
+          return;
+        }
+
+        if (this.state === STATES.LEADERBOARD) {
+          this.lbRenderer.update(dt);
+          return;
+        }
+
+        if (this.state === STATES.DAILY) {
+          this.dailyRenderer.update(dt);
+          return;
+        }
+
+        if (this.state !== STATES.PLAYING) {
+          this.particles.forEach(p => p.update());
+          this.particles = this.particles.filter(p => !p.isDead());
+          return;
+        }
+
+        // Spawn pipes
+        if (timestamp - this.lastPipeTime > PIPE_INTERVAL) {
+          this.pipes.push(new Pipe(CANVAS_W + 20));
+          this.lastPipeTime = timestamp;
+        }
+
+        // Update pipes & check score
+        this.pipes.forEach(p => {
+          p.update();
+          if (p.isPassed(this.bird.x + 16)) {
+            p.scored = true;
+            const perfect = p.isPerfect(this.bird.y);
+            this._addPoint(perfect);
+          }
+        });
+        this.pipes = this.pipes.filter(p => !p.isOffScreen());
+
+        // Floating texts
+        this.floatingTexts.forEach(t => t.update());
+        this.floatingTexts = this.floatingTexts.filter(t => !t.isDead());
+
+        // Particles
+        this.particles.forEach(p => p.update());
+        this.particles = this.particles.filter(p => !p.isDead());
+
+        // Immunity check
+        if (this.invulnerableFrames > 0) {
+          this.invulnerableFrames--;
+          // Avoid falling off the bottom while invulnerable (bounce instead)
+          if (this.bird.y + this.bird.radius >= CANVAS_H - GROUND_H) {
+            this.bird.y = CANVAS_H - GROUND_H - this.bird.radius;
+            this.bird.jump();
+          }
+        } else {
+          let crashed = false;
+          // Collision: ground
+          if (this.bird.y + this.bird.radius >= CANVAS_H - GROUND_H) {
+             this.bird.y = CANVAS_H - GROUND_H - this.bird.radius;
+             crashed = true;
+          }
+          // Collision: ceiling
+          else if (this.bird.y - this.bird.radius <= 0) {
+             this.bird.y = this.bird.radius;
+             crashed = true;
+          }
+          // Collision: pipes
+          else {
+             for (const p of this.pipes) {
+               if (p.collides(this.bird)) {
+                 crashed = true;
+                 break;
+               }
+             }
+          }
+
+          if (crashed) {
+             if (this.score >= 40 && !this.hasRevived) {
+                this._triggerRevive();
+             } else {
+                this._gameOver();
+                return;
+             }
+          }
+        }
+
+        if (this.shakeFrames > 0) this.shakeFrames--;
+      }
+
+      _render() {
+        const ctx = this.ctx;
+
+        ctx.save();
+        if (this.shakeFrames > 0) {
+          const s = this.shakeIntensity * (this.shakeFrames / 18);
+          ctx.translate(
+            (Math.random() - 0.5) * s,
+            (Math.random() - 0.5) * s
+          );
+        }
+
+        ctx.clearRect(-10, -10, CANVAS_W + 20, CANVAS_H + 20);
+
+        this.env.draw(ctx);
+        this.pipes.forEach(p => p.draw(ctx));
+        this.particles.forEach(p => p.draw(ctx));
+
+        // Blink bird if invulnerable
+        if (this.invulnerableFrames > 0 && Math.floor(performance.now() / 60) % 2 === 0) {
+           ctx.globalAlpha = 0.3;
+        }
+        this.bird.draw(ctx);
+        ctx.globalAlpha = 1.0;
+
+        // Floating PERFECT / +N texts
+        this.floatingTexts.forEach(t => t.draw(ctx));
+
+        // Combo HUD (top-right, only during play)
+        if (this.state === STATES.PLAYING && this.combo > 0) {
+          this._drawComboHUD(ctx);
+        }
+
+        // Draw MENU overlay on top of game scene
+        if (this.state === STATES.MENU) {
+          this.menuRenderer.draw(ctx, this.selectedSkinIdx);
+        }
+
+        // Draw LEADERBOARD panel
+        if (this.state === STATES.LEADERBOARD) {
+          this.lbRenderer.draw(ctx, ApiClient.username);
+        }
+
+        // Draw DAILY CHALLENGE panel
+        if (this.state === STATES.DAILY) {
+          this.dailyRenderer.draw(ctx);
+        }
+
+        ctx.restore();
+      }
+
+      // Pulsing combo badge — top-right corner
+      _drawComboHUD(ctx) {
+        ctx.save();
+        const pulse = 0.85 + 0.15 * Math.sin(performance.now() * 0.008);
+        ctx.globalAlpha = pulse;
+        ctx.textAlign   = 'right';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur  = 6;
+
+        // Combo tier colour: white → yellow → orange → red
+        const pct = this.combo / COMBO_MAX;
+        const r = Math.round(255);
+        const g = Math.round(255 * (1 - pct * 0.7));
+        const b = Math.round(80  * (1 - pct));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+
+        ctx.font = `bold 9px "Press Start 2P", monospace`;
+        ctx.fillText(`\u00d7${this.combo} COMBO`, CANVAS_W - 14, 72);
+        ctx.restore();
+      }
+    }
+
+    // ─── BOOT ──────────────────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+      // roundRect polyfill for older browsers
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+          r = Math.min(r, w / 2, h / 2);
+          this.beginPath();
+          this.moveTo(x + r, y);
+          this.arcTo(x + w, y, x + w, y + h, r);
+          this.arcTo(x + w, y + h, x, y + h, r);
+          this.arcTo(x, y + h, x, y, r);
+          this.arcTo(x, y, x + w, y, r);
+          this.closePath();
+          return this;
+        };
+      }
+
+      // ── Username modal logic ─────────────────────────────────────────────────
+      const modal    = document.getElementById('username-modal');
+      const input    = document.getElementById('username-input');
+      const submitBtn = document.getElementById('username-submit');
+      const errorEl  = document.getElementById('username-error');
+      const statusEl = document.getElementById('modal-status');
+
+      const savedUsername = localStorage.getItem('flappy_username');
+
+      async function bootGame() {
+        // Load server data into localStorage, then start game
+        await Stats.loadFromServer();
+        new Game();
+      }
+
+      if (savedUsername) {
+        // Already have a username — restore token and go straight to game
+        const savedToken = localStorage.getItem('flappy_token');
+        if (savedToken) {
+          ApiClient._username = savedUsername;
+          ApiClient._token    = savedToken;
+        }
+        modal.classList.add('hidden');
+        bootGame();
+      } else {
+        // Show modal — user must enter a username
+        modal.classList.remove('hidden');
+        input.focus();
+
+        async function handleSubmit() {
+          const raw = input.value.trim();
+          if (!raw) { errorEl.textContent = 'Please enter a username'; return; }
+          if (raw.length < 2) { errorEl.textContent = 'Too short (min 2 chars)'; return; }
+          if (!/^[a-zA-Z0-9_-]+$/.test(raw)) {
+            errorEl.textContent = 'Letters, numbers, _ and - only';
+            return;
+          }
+          errorEl.textContent = '';
+          submitBtn.disabled = true;
+          statusEl.textContent = 'Connecting…';
+
+          try {
+            await ApiClient.createOrLogin(raw);
+            statusEl.textContent = `Welcome, ${ApiClient.username}!`;
+            await new Promise(r => setTimeout(r, 500));
+            modal.classList.add('hidden');
+            bootGame();
+          } catch (err) {
+            // Server offline or validation error — still allow offline play
+            submitBtn.disabled = false;
+            if (err.message.includes('fetch') || err.message.includes('Failed')) {
+              // Network error — save username locally and play offline
+              const fallback = raw.toLowerCase();
+              localStorage.setItem('flappy_username', fallback);
+              ApiClient._username = fallback;
+              ApiClient._online   = false;
+              statusEl.textContent = '';
+              errorEl.textContent  = 'Server offline — playing locally';
+              await new Promise(r => setTimeout(r, 800));
+              modal.classList.add('hidden');
+              bootGame();
+            } else {
+              statusEl.textContent = '';
+              errorEl.textContent  = err.message;
+            }
+          }
+        }
+
+        submitBtn.addEventListener('click', handleSubmit);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+      }
+    });
+  </script>
+</body>
+
+</html>
